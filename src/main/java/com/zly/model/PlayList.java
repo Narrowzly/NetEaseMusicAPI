@@ -5,11 +5,13 @@ public class PlayList {
 	private String title;
 	private String playListUrl;
 	private String id;
-	public PlayList(String imgUrl, String title, String playListUrl, String id) {
+	private String creator;
+	public PlayList(String imgUrl, String title, String playListUrl, String id, String creator) {
 		this.imgUrl = imgUrl;
 		this.title = title;
 		this.playListUrl = playListUrl;
 		this.id = id;
+		this.creator = creator;
 	}
 	public String getImgUrl() {
 		return imgUrl;
@@ -34,5 +36,11 @@ public class PlayList {
 	}
 	public void setId(String id) {
 		this.id = id;
+	}
+	public String getCreator() {
+		return creator;
+	}
+	public void setCreator(String creator) {
+		this.creator = creator;
 	}
 }

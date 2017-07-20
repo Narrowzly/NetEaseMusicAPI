@@ -33,6 +33,7 @@ import com.zly.model.Image;
 import com.zly.model.PlayList;
 import com.zly.model.Song;
 import com.zly.model.SongList;
+import com.zly.model.ZZW;
 import com.zly.model.Fuckzzw;
 import com.zly.server.FuckZZW;
 
@@ -45,7 +46,7 @@ public class NetEaseMusicSpider {
 	private static String playListUrl = "http://music.163.com/playlist?id=";
 	private static String imgListUrl = "https://music.163.com/discover";
 	private static String topListUrl = "https://music.163.com/discover/toplist?id=";
-	private static String fuckZZWUrl = "http://music.163.com/discover/toplist";	
+	private static String fuckZZWUrl = "http://music.163.com/discover/toplist";
 	private static Encrypter encrypter = null;
 	private static String type = "1";
 	private static String limit = "20";
@@ -155,11 +156,13 @@ public class NetEaseMusicSpider {
 		for(Element playList:playLists) {
 			Element img = playList.getElementsByClass("j-flag").first();
 			Element a = playList.getElementsByClass("msk").first();
+			Element user = playList.getElementsByClass("nm").first();
 			String imgUrl = img.attr("src");
 			String title = a.attr("title");
+			String creator = user.attr("title");
 			String playListUrl = a.attr("href");
 			String id = playListUrl.split("=")[1];
-			p.add(new PlayList(imgUrl, title, playListUrl, id));
+			p.add(new PlayList(imgUrl, title, playListUrl, id, creator));
 		}
 		return p;
 	}
@@ -206,7 +209,7 @@ public class NetEaseMusicSpider {
 				.userAgent(userAgent).get();
 		Element brotherFatherList = doc.getElementById("g_backtop");
 		Element fatherList = brotherFatherList.nextElementSibling();
-		String jsonArray = fatherList.outerHtml().split(";")[0].split("Gbanners\\s+=")[1];//Jsoup无法解析script的文本内容
+		String jsonArray = fatherList.outerHtml().split(";")[0].split("Gbanners\\s+=")[1];//Jsoup鏃犳硶瑙ｆ瀽script鐨勬枃鏈唴瀹�
 		JSONArray imgArray = JSON.parseArray(jsonArray);
 		List<Image> imageList = new ArrayList<>();
 		for(int i=0;i<imgArray.size();i++) {
@@ -215,7 +218,7 @@ public class NetEaseMusicSpider {
 		}
 		return imageList;
 	}
-	public List<Fuckzzw> fuckZZW() throws IOException {
+	public ZZW fuckZZW() throws IOException, InterruptedException {
 		Document doc = Jsoup.connect(fuckZZWUrl)
 					.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 					.header("Accept-Encoding","gzip, deflate, sdch")
@@ -228,16 +231,33 @@ public class NetEaseMusicSpider {
 					.userAgent(userAgent).get();
 		Element toplistFather = doc.getElementById("toplist");
 		Element toplistsFather = toplistFather.getElementsByTag("ul").first();
+		Element topListsFather2 = toplistFather.getElementsByTag("ul").get(1);
+		Elements toplists2 = topListsFather2.getElementsByTag("li");
 		Elements toplists = toplistsFather.getElementsByTag("li");
-		List<Fuckzzw> list = new ArrayList<>();
+		List<Fuckzzw> list1 = new ArrayList<>();
+		List<Fuckzzw> list2 = new ArrayList<>();
 		for(Element toplist:toplists) {
 			String id = toplist.attr("data-res-id");
 			Element img = toplist.getElementsByTag("img").first();
-			String coverUrl = img.attr("src");
+			String coverUrl = img.attr("src").split("\\?")[0];
 			String name = img.attr("alt");
-			list.add(new Fuckzzw(id, name, coverUrl));
+			Thread.sleep(500);
+			List<Song> topThreeList = new ArrayList<>();
+			List<Song> songList = getTopList(id);
+			for(int i=0;i<3;i++) {
+				topThreeList.add(songList.get(i));
+			}
+			Fuckzzw zzw = new Fuckzzw(id, name, coverUrl, topThreeList);
+			list1.add(zzw);
 		}
-		return list;
+		for(Element toplist:toplists2) {
+			String id = toplist.attr("data-res-id");
+			Element img = toplist.getElementsByTag("img").first();
+			String coverUrl = img.attr("src").split("\\?")[0];
+			String name = img.attr("alt");
+			list2.add(new Fuckzzw(id, name, coverUrl));
+		}
+		return new ZZW(list1, list2);
 	}
 	public List<Song> getTopList(String topListId) throws IOException {
 		Document doc = Jsoup.connect(topListUrl+ topListId)
