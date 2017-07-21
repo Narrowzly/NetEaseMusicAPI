@@ -11,18 +11,16 @@ import org.apache.log4j.Logger;
 
 import com.alibaba.fastjson.JSONArray;
 import com.zly.apispider.NetEaseMusicSpider;
+import com.zly.apispider.WrapperResp;
 import com.zly.model.Image;
 
+@SuppressWarnings("all")
 public class ImageList extends HttpServlet {
 	private static Logger logger = Logger.getLogger(ImageList.class);
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
-		resp.setCharacterEncoding("utf-8");
-		resp.setContentType("text/html;charset=UTF-8");
-		resp.setHeader("Access-Control-Allow-Origin", "*");
-		resp.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-		resp.setHeader("Access-Control-Allow-Headers", "Origin, No-Cache, X-Requested-With, If-Modified-Since, Pragma, Last-Modified, Cache-Control, Expires, 　　Content-Type, X-E4M-With");
+		resp = WrapperResp.wrap(resp);
 		try {
-			List<Image> l = NetEaseMusicSpider.getInstance().init().getImgList();
+			List<Image> l = NetEaseMusicSpider.getInstance().getImgList();
 			JSONArray array = new JSONArray();
 			array.addAll(l);
 			PrintWriter writer = resp.getWriter();

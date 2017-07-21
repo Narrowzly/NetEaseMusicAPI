@@ -17,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.apache.log4j.Logger;
 
 
-
+@SuppressWarnings("all")
 public class Encrypter {
 	private static Logger logger = Logger.getLogger(Encrypter.class);
 	private static Encrypter encryter = null;

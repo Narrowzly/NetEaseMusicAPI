@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.http.Consts;
-import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.ParseException;
@@ -14,7 +13,6 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
@@ -29,58 +27,42 @@ import com.alibaba.fastjson.JSONObject;
 import com.zly.apispider.encrypt.Encrypter;
 import com.zly.model.Album;
 import com.zly.model.Artist;
+import com.zly.model.EncrypterSong;
 import com.zly.model.Image;
 import com.zly.model.PlayList;
 import com.zly.model.Song;
 import com.zly.model.SongList;
 import com.zly.model.ZZW;
 import com.zly.model.Fuckzzw;
-import com.zly.server.FuckZZW;
+
 
 public class NetEaseMusicSpider {
-	private static Logger logger = Logger.getLogger(NetEaseMusicSpider.class);
-	private static CloseableHttpClient client = null;
-	private static String searchUrl = "http://music.163.com/api/search/pc";
-	private static String songUrl = "http://music.163.com/weapi/song/enhance/player/url?csrf_token=";
-	private static String hotUrl = "http://music.163.com/discover/playlist/?order=hot&limit=";
-	private static String playListUrl = "http://music.163.com/playlist?id=";
-	private static String imgListUrl = "https://music.163.com/discover";
-	private static String topListUrl = "https://music.163.com/discover/toplist?id=";
-	private static String fuckZZWUrl = "http://music.163.com/discover/toplist";
-	private static Encrypter encrypter = null;
-	private static String type = "1";
-	private static String limit = "20";
-	private static Header[] headers = null;
+	private Logger logger = Logger.getLogger(NetEaseMusicSpider.class);
+	private CloseableHttpClient client = null;
+	private Encrypter encrypter = null;
 	private static NetEaseMusicSpider spider;
-	private static String userAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.157 Safari/537.36";
+	private SpiderConfig config;
+	
 	private NetEaseMusicSpider() {
-		
+		config = new SpiderConfig();
+		client = HttpClients.createDefault(); 
+		encrypter = Encrypter.getInstance();
 	}
 	public static NetEaseMusicSpider getInstance() {
 		return spider!=null?spider:new NetEaseMusicSpider();
 	}
-	public NetEaseMusicSpider init() {
-		client = HttpClients.createDefault(); 
-		encrypter = Encrypter.getInstance();
-		headers = new BasicHeader[5];
-		headers[0] = new BasicHeader("Accept", "*");
-		headers[1] = new BasicHeader("Accept-Enocding","gzip,deflate");
-		headers[2] = new BasicHeader("Accept-Language","en-us,en;q=0.8");
-		headers[3] = new BasicHeader("User-Agent",userAgent);
-		headers[4] = new BasicHeader("Cookie","appver=2.1.2.185222");
-		return this;
-	}
+	
 	public List<Song> search(String keyword, String pageNum) throws ParseException, IOException {
-		HttpPost post = new HttpPost(searchUrl);
+		HttpPost post = new HttpPost(config.getSearchUrl());
 		HttpResponse response = null;
 		String offset = String.valueOf(Integer.parseInt(pageNum)*20);
 		List<NameValuePair> params = new ArrayList<>();
-		params.add(new BasicNameValuePair("limit", limit));
+		params.add(new BasicNameValuePair("limit", config.getLimit()));
 		params.add(new BasicNameValuePair("offset", offset));
-		params.add(new BasicNameValuePair("type", type));
+		params.add(new BasicNameValuePair("type", config.getType()));
 		params.add(new BasicNameValuePair("s", keyword));
 		post.setEntity(new UrlEncodedFormEntity(params, Consts.UTF_8));
-		post.setHeaders(headers);
+		post.setHeaders(config.getHeaders());
 		try {
 			response = client.execute(post);
 		} catch (ClientProtocolException e) {
@@ -112,16 +94,12 @@ public class NetEaseMusicSpider {
 		return songList;
 	}
 	public String getSongUrl(String id) {
-		StringBuilder jsonBuilder = new StringBuilder();
-		jsonBuilder.append("{\"ids\":");
-		jsonBuilder.append("["+id+"],");
-		jsonBuilder.append("\"br\":");
-		jsonBuilder.append("320000,");
-		jsonBuilder.append("\"crsf_token\":");
-		jsonBuilder.append("''}");
-		String[] postparams = encrypter.encryptedRequest(jsonBuilder.toString());
-		HttpPost post = new HttpPost(songUrl);
-		post.setHeaders(headers);
+		List<String> ids = new ArrayList<>();
+		ids.add(id);
+		String encryptedSong = JSON.toJSONString(new EncrypterSong(ids, "320000", ""));
+		String[] postparams = encrypter.encryptedRequest(encryptedSong);
+		HttpPost post = new HttpPost(config.getSongUrl());
+		post.setHeaders(config.getHeaders());
 		List<NameValuePair> params = new ArrayList<>();
 		params.add(new BasicNameValuePair("params", postparams[0]));
 		params.add(new BasicNameValuePair("encSecKey", postparams[1]));
@@ -139,17 +117,12 @@ public class NetEaseMusicSpider {
 		}
 		return "nothing";
 	}
+	
 	public List<PlayList> getPlayList(String limit, String page) throws IOException{
-		Document doc = Jsoup.connect(hotUrl+limit+"&offset="+Integer.parseInt(page)*Integer.parseInt(limit))
-				.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-				.header("Accept-Encoding","gzip, deflate, sdch")
-				.header("Accept-Language","zh-CN,zh;q=0.8")
-				.header("Cache-Control","max-age=0")
-				.header("Connection","keep-alive")
-				.header("Host","music.163.com")
-				.header("Refer","http://music.163.com/")
-				.header("Upgrade-Insecure-Requests","1")
-				.userAgent(userAgent).get();
+		Document doc = config.configHeaders (
+				Jsoup.connect(config.getHotUrl()+limit+"&offset="+
+				Integer.parseInt(page)*Integer.parseInt(limit))
+				);	
 		Element playListFather = doc.getElementById("m-pl-container");
 		Elements playLists = playListFather.children();
 		List<PlayList> p = new ArrayList<>();
@@ -167,7 +140,7 @@ public class NetEaseMusicSpider {
 		return p;
 	}
 	public SongList getSongList(String num) throws IOException{
-		Document doc = Jsoup.connect(playListUrl+num).userAgent(userAgent).get();
+		Document doc = config.configHeaders(Jsoup.connect(config.getPlayListUrl()+num));
 		String title = doc.title();
 		String listId = doc.getElementById("content-operation").attr("data-rid");
 		String coverUrl = doc.getElementsByClass("j-img").first().attr("src");
@@ -197,16 +170,7 @@ public class NetEaseMusicSpider {
 		return l;
 	}
 	public List<Image> getImgList() throws IOException {
-		Document doc = Jsoup.connect(imgListUrl)
-				.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-				.header("Accept-Encoding","gzip, deflate, sdch")
-				.header("Accept-Language","zh-CN,zh;q=0.8")
-				.header("Cache-Control","max-age=0")
-				.header("Connection","keep-alive")
-				.header("Host","music.163.com")
-				.header("Refer","http://music.163.com/")
-				.header("Upgrade-Insecure-Requests","1")
-				.userAgent(userAgent).get();
+		Document doc = config.configHeaders(Jsoup.connect(config.getImgListUrl()));
 		Element brotherFatherList = doc.getElementById("g_backtop");
 		Element fatherList = brotherFatherList.nextElementSibling();
 		String jsonArray = fatherList.outerHtml().split(";")[0].split("Gbanners\\s+=")[1];//Jsoup鏃犳硶瑙ｆ瀽script鐨勬枃鏈唴瀹�
@@ -219,16 +183,7 @@ public class NetEaseMusicSpider {
 		return imageList;
 	}
 	public ZZW fuckZZW() throws IOException, InterruptedException {
-		Document doc = Jsoup.connect(fuckZZWUrl)
-					.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-					.header("Accept-Encoding","gzip, deflate, sdch")
-					.header("Accept-Language","zh-CN,zh;q=0.8")
-					.header("Cache-Control","max-age=0")
-					.header("Connection","keep-alive")
-					.header("Host","music.163.com")
-					.header("Refer","http://music.163.com/")
-					.header("Upgrade-Insecure-Requests","1")
-					.userAgent(userAgent).get();
+		Document doc = config.configHeaders(Jsoup.connect(config.getFuckZZWUrl()));
 		Element toplistFather = doc.getElementById("toplist");
 		Element toplistsFather = toplistFather.getElementsByTag("ul").first();
 		Element topListsFather2 = toplistFather.getElementsByTag("ul").get(1);
@@ -260,16 +215,7 @@ public class NetEaseMusicSpider {
 		return new ZZW(list1, list2);
 	}
 	public List<Song> getTopList(String topListId) throws IOException {
-		Document doc = Jsoup.connect(topListUrl+ topListId)
-				.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-				.header("Accept-Encoding","gzip, deflate, sdch")
-				.header("Accept-Language","zh-CN,zh;q=0.8")
-				.header("Cache-Control","max-age=0")
-				.header("Connection","keep-alive")
-				.header("Host","music.163.com")
-				.header("Refer","http://music.163.com/")
-				.header("Upgrade-Insecure-Requests","1")
-				.userAgent(userAgent).get();
+		Document doc = config.configHeaders(Jsoup.connect(config.getTopListUrl()+ topListId));
 		Element songListFather = doc.getElementsByTag("textarea").first();
 		JSONArray songList = JSON.parseArray(songListFather.text());
 		List<Song> list = new ArrayList<>();
