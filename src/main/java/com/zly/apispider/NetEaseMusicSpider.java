@@ -1,4 +1,4 @@
-	package com.zly.apispider;
+package com.zly.apispider;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,8 +38,8 @@ import com.zly.model.Fuckzzw;
 
 public class NetEaseMusicSpider {
 	private Logger logger = Logger.getLogger(NetEaseMusicSpider.class);
-	private CloseableHttpClient client = null;
-	private Encrypter encrypter = null;
+	private CloseableHttpClient client;
+	private Encrypter encrypter;
 	private static NetEaseMusicSpider spider;
 	private SpiderConfig config;
 	
